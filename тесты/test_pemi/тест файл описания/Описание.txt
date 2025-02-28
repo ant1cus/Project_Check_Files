@@ -1,0 +1,10 @@
+Описание
+Mon_LVDS
+SSD_SATA
+DVD
+Print_USB
+Реж_печ
+scan
+klava
+lan100
+
