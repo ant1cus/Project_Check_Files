@@ -1,5 +1,0 @@
-﻿{
-    "widget_settings": {
-        "lineEdit_path_folder": "D:/python/Project_Check_File/test"
-    }
-}

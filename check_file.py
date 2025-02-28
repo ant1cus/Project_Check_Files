@@ -1,62 +1,76 @@
-import datetime
 import os
 import re
 import pathlib
 import threading
+import time
 import traceback
 import pandas as pd
-from win32_setctime import setctime
 from PyQt5.QtCore import QThread, pyqtSignal
+from DoingWindow import CheckWindow
 
 
+class CancelException(Exception):
+    pass
 
-class CheckFile(QThread):
-    progress = pyqtSignal(int)  # Сигнал для progressBar
-    status = pyqtSignal(str)  # Сигнал для статус бара
-    messageChanged = pyqtSignal(str, str)
+
+class CheckCC(QThread):
+    status_finish = pyqtSignal(str, str)
+    progress_value = pyqtSignal(int)
+    info_value = pyqtSignal(str, str)
+    status = pyqtSignal(str)
+    line_progress = pyqtSignal(str)
+    line_doing = pyqtSignal(str)
     errors = pyqtSignal()
 
     def __init__(self, incoming_data):  # Список переданных элементов.
         QThread.__init__(self)
-        self.folder = incoming_data['folder']
-        self.button = incoming_data['button']
+        self.folder = incoming_data['check_folder']
         self.logging = incoming_data['logging']
         self.queue = incoming_data['queue']
         self.default_path = incoming_data['default_path']
         self.event = threading.Event()
-        self.percent = 0
+        self.all_doc = 0
+        self.now_doc = 0
+        self.percent_progress = 0
         self.progress_val = 0
         self.error_text = []
-
-    def check_file(self) -> None:
-        pass
+        self.event = threading.Event()
+        self.event.set()
+        self.move = incoming_data['move']
+        self.name_dir = pathlib.Path(self.folder).name
+        title = f'Проверка значений сплошного спектра в «{self.name_dir}»'
+        self.window_check = CheckWindow(self.default_path, self.event, self.move, title)
+        self.progress_value.connect(self.window_check.progressBar.setValue)
+        self.line_progress.connect(self.window_check.lineEdit_progress.setText)
+        self.line_doing.connect(self.window_check.lineEdit_doing.setText)
+        self.info_value.connect(self.window_check.info_message)
+        self.window_check.show()
 
     def run(self):
         try:
+            current_progress = 0
+            for _ in pathlib.Path(self.folder).rglob("*.xlsx"):
+                self.all_doc += 1
+            self.percent_progress = 100 / self.all_doc
             self.logging.info('Начинаем проверку файлов')
-            self.status.emit('Старт')
-            self.progress.emit(self.progress_val)
+            self.line_progress.emit(f'Выполнено {int(current_progress)} %')
+            self.progress_value.emit(0)
             for excel_file in pathlib.Path(self.folder).rglob("*.xlsx"):
-                self.percent += 1
-            for excel_file in pathlib.Path(self.folder).rglob("*.xlsx"):
-                if self.pause_threading():
-                    self.logging.error('Прервано пользователем')
-                    self.progress.emit(0)
-                    os.chdir(self.default_path)
-                    self.button.setText('Старт')
-                    self.logging.info('----------------Прервано Check_file----------------')
-                    return
+                self.now_doc += 1
+                self.line_doing.emit(f'Проверяем {excel_file} ({self.now_doc} из {self.all_doc})')
+                self.event.wait()
+                if self.window_check.stop_threading:
+                    raise CancelException()
+                self.logging.info(f'Проверяем {excel_file}')
                 error = []
-                direcotry = os.path.basename(excel_file.parent)
+                directory = os.path.basename(excel_file.parent)
                 file = excel_file.name
-                # date = datetime.datetime.fromtimestamp(os.path.getctime(excel_file)).date()
                 df = pd.read_excel(excel_file, header=None)
                 if not re.findall(r'[0-9]{2}\.\w+\s[0-9]{4}', str(df.iloc[2, 1])):
                     error.append('некорректный формат даты в ячейке B3')
-                    # df.iloc[2, 1] = datetime.datetime.strftime(date, '%d.%b %Y')
                 if str(df.iloc[4, 1]) != 'ON':
                     error.append('некорректное значение предусилителя в ячейке B5')
-                standart_frq = [
+                standard_frq = [
                     {'frq_start': '9','frq_stop': '150', 'start': '9100', 'stop': '149900', 'rbw': '200', 'values': '705'},
                     {'frq_start': '150','frq_stop': '30', 'start': '154500', 'stop': '29998500', 'rbw': '9000', 'values': '3317'},
                     {'frq_start': '30','frq_stop': '1','start': '30060000', 'stop': '999900000', 'rbw': '120000', 'values': '8083'},
@@ -65,7 +79,8 @@ class CheckFile(QThread):
                 start_val = 0
                 stop_val = 0
                 all_val = 0
-                for item in standart_frq:
+                self.logging.info(f'Проверяем standard_frq')
+                for item in standard_frq:
                     pattern = f"({item['frq_start']}+).+({item['frq_stop']}+)"
                     if re.findall(pattern, file):
                         start_val = item['start']
@@ -82,54 +97,62 @@ class CheckFile(QThread):
                         if str(df.iloc[29, 1]) != item['values']:
                             error.append('некорректное кол-во значений в ячейке B30')
                         continue
+                self.logging.info(f'Проверяем оставшиеся значения')
                 if str(df.iloc[30, 0]) != start_val:
                     error.append('некорректная стартовая частота в ячейке A31')
                 if len(df.iloc[slice(30, df.shape[0]), 0]) != all_val:
                     error.append('кол-во значений в столбце 1 не соответствует типовому значению')
                 number = df.iloc[slice(30, df.shape[0]), 0]
                 int_number = number[number.map(lambda x: isinstance(x, int))]
-                # tmp_df = df.iloc[slice(30, df.shape[0]), 0].select_dtypes(include='int64')
                 if int_number.size != all_val:
-                    result=[str(x) for x in (set(number.index) - set(int_number.index))]
+                    result = [str(x) for x in (set(number.index) - set(int_number.index))]
                     text = 'Строка с ошибкой:' if len(result) == 1 else 'Строки с ошибками:'
-                    error.append(f"кол-во целых значений в столбце 1 не соответствует типовому значению. {text} {', '.join(result)}")
+                    error.append(f"кол-во целых значений в столбце 1 не соответствует типовому значению."
+                                 f" {text} {', '.join(result)}")
                 if str(df.iloc[df.shape[0] - 1, 0]) != stop_val:
                     error.append(f'некорректная конечная частота в ячейке A{df.shape[0]}')
                 if error:
+                    self.logging.info(f'Добавляем ошибки')
                     number_error = [str(enum + 1) + ') ' + x for enum, x in enumerate(error)]
                     error_text = '\n'.join(number_error)
-                    self.error_text.append(f"Папка '{direcotry}', файл '{file}', ошибки:\n{error_text}")
+                    self.error_text.append(f"Папка '{directory}', файл '{file}', ошибки:\n{error_text}")
+                current_progress += self.percent_progress
+                self.line_progress.emit(f'Выполнено {int(current_progress)} %')
+                self.progress_value.emit(int(current_progress))
             if self.error_text:
                 self.logging.info("Выводим ошибки")
-                self.status.emit('Готово с ошибками')
-                self.queue.put({'errors': self.error_text})
+                self.queue.put(
+                    {'title': f"При проверке сплошного спектра в папке «{self.name_dir}» обнаружены следующие ошибки:",
+                     'text': self.error_text}
+                )
                 self.errors.emit()
-            else:
-                self.logging.info("----------------Конец работы программы Check_file----------------")
-                self.status.emit('Готово')
+            self.line_progress.emit(f'Выполнено 100 %')
+            self.progress_value.emit(int(100))
+            self.logging.info(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» успешно завершена")
+            self.status.emit(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» успешно завершена")
             os.chdir(self.default_path)
-            self.progress.emit(100)
-            self.button.setText('Старт')
+            self.status_finish.emit('check_cc', str(self))
+            time.sleep(1)  # Не удалять, не успевает отработать emit status_finish. Может потом
+            self.window_check.close()
+            return
+        except CancelException:
+            self.logging.warning(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» отменена пользователем")
+            self.status.emit(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» отменена пользователем")
+            os.chdir(self.default_path)
+            self.status_finish.emit('check_cc', str(self))
+            time.sleep(1)  # Не удалять, не успевает отработать emit status_finish. Может потом
+            self.window_check.close()
             return
         except BaseException as es:
             self.logging.error(es)
             self.logging.error(traceback.format_exc())
-            self.progress.emit(0)
-            self.status.emit('Ошибка!')
-            os.chdir(self.default_path)
-            self.button.setText('Старт')
-            self.logging.error('----------------Ошибка Check_file----------------')
-            return
-
-    def pause_threading(self) -> bool:
-        question = False if self.queue.empty() else self.queue.get_nowait()
-        if question:
-            self.messageChanged.emit('Вопрос?', 'Проверка файлов остановлена пользователем.'
-                                                ' Нажмите «Да» для продолжения или «Нет» для прерывания')
-            self.event.wait()
+            self.logging.warning(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» не завершена из-за ошибки")
+            self.info_value.emit('УПС!', 'Работа программы завершена из-за непредвиденной ошибки')
             self.event.clear()
-            if self.queue.get_nowait():
-                self.status.emit('Прервано пользователем')
-                self.progress.emit(0)
-                return True
-        return False
+            self.event.wait()
+            self.status.emit(f"Ошибка при проверке файлов со сплошным спектром в папке «{self.name_dir}»")
+            os.chdir(self.default_path)
+            self.status_finish.emit('check_cc', str(self))
+            time.sleep(1)  # Не удалять, не успевает отработать emit status_finish. Может потом
+            self.window_check.close()
+            return
