@@ -121,13 +121,13 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="tab_continuos_spectrum">
+      <widget class="QWidget" name="tab_cs">
        <attribute name="title">
         <string>Сплошной спектр</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_4">
         <item row="1" column="2">
-         <widget class="QPushButton" name="pushButton_open_folder_cc">
+         <widget class="QPushButton" name="pushButton_open_folder_cs">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
             <horstretch>0</horstretch>
@@ -148,7 +148,7 @@
          </widget>
         </item>
         <item row="1" column="1">
-         <widget class="QLineEdit" name="lineEdit_path_folder_cc">
+         <widget class="QLineEdit" name="lineEdit_path_folder_cs">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
             <horstretch>0</horstretch>
@@ -166,7 +166,7 @@
          </widget>
         </item>
         <item row="2" column="0" colspan="3">
-         <widget class="QPushButton" name="pushButton_start_cc">
+         <widget class="QPushButton" name="pushButton_start_cs">
           <property name="font">
            <font>
             <pointsize>10</pointsize>
@@ -181,7 +181,7 @@
          </widget>
         </item>
         <item row="1" column="0">
-         <widget class="QLabel" name="label_path_cc">
+         <widget class="QLabel" name="label_path_cs">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
             <horstretch>0</horstretch>

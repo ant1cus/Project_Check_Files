@@ -13,7 +13,7 @@ class CancelException(Exception):
     pass
 
 
-class CheckCC(QThread):
+class CheckCS(QThread):
     status_finish = pyqtSignal(str, str)
     progress_value = pyqtSignal(int)
     info_value = pyqtSignal(str, str)
@@ -131,7 +131,7 @@ class CheckCC(QThread):
             self.logging.info(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» успешно завершена")
             self.status.emit(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» успешно завершена")
             os.chdir(self.default_path)
-            self.status_finish.emit('check_cc', str(self))
+            self.status_finish.emit('check_cs', str(self))
             time.sleep(1)  # Не удалять, не успевает отработать emit status_finish. Может потом
             self.window_check.close()
             return
@@ -139,7 +139,7 @@ class CheckCC(QThread):
             self.logging.warning(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» отменена пользователем")
             self.status.emit(f"Проверка файлов со сплошным спектром в папке «{self.name_dir}» отменена пользователем")
             os.chdir(self.default_path)
-            self.status_finish.emit('check_cc', str(self))
+            self.status_finish.emit('check_cs', str(self))
             time.sleep(1)  # Не удалять, не успевает отработать emit status_finish. Может потом
             self.window_check.close()
             return
@@ -152,7 +152,7 @@ class CheckCC(QThread):
             self.event.wait()
             self.status.emit(f"Ошибка при проверке файлов со сплошным спектром в папке «{self.name_dir}»")
             os.chdir(self.default_path)
-            self.status_finish.emit('check_cc', str(self))
+            self.status_finish.emit('check_cs', str(self))
             time.sleep(1)  # Не удалять, не успевает отработать emit status_finish. Может потом
             self.window_check.close()
             return

@@ -60,12 +60,12 @@ def checked_pemi(lineedit_path_pemi: str, group_check: bool, freq_lim: bool, twe
                                                      'progress': progress}
 
 
-def checked_cc(lineedit_path_folder_cc: str) -> dict or list:
-    folder = lineedit_path_folder_cc
+def checked_cs(lineedit_path_folder_cs: str) -> dict or list:
+    folder = lineedit_path_folder_cs
     if not folder:
         return ['УПС!', 'Путь к папке с файлами сплошного спектра пуст']
     if not os.path.isdir(folder):
-        return ['УПС!', 'Указанный путь к проверяемым файлам сплошного спектра не является директорией']
+        return ['УПС!', 'Указанный путь к проверяемым файлам сплошного спектра удалён или переименован']
     if not os.listdir(folder):
         return ['УПС!', 'В указанной директории отсутствуют файлы сплошного спектра для проверки']
     return {'check_folder': folder}
