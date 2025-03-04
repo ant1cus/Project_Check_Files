@@ -66,6 +66,7 @@ def checked_cs(lineedit_path_folder_cs: str) -> dict or list:
         return ['УПС!', 'Путь к папке с файлами сплошного спектра пуст']
     if not os.path.isdir(folder):
         return ['УПС!', 'Указанный путь к проверяемым файлам сплошного спектра удалён или переименован']
-    if not os.listdir(folder):
+    all_doc = len(list(filter(pathlib.Path.is_file, pathlib.Path(folder).glob("*.xlsx"))))
+    if all_doc == 0:
         return ['УПС!', 'В указанной директории отсутствуют файлы сплошного спектра для проверки']
     return {'check_folder': folder}
